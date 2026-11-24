@@ -1,0 +1,12 @@
+{
+  "appId": "com.camaraesp32.app",
+  "appName": "Cámara ESP32",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
