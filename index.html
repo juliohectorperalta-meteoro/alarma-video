@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Cámara ESP32</title>
+<style>
+  :root{--bg:#0f1115;--card:#1a1d24;--txt:#e8e8e8;--sub:#9aa0aa;--acc:#2e8bff;--on:#e0a800;--err:#e5484d;--ok:#30a46c}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Roboto,sans-serif;
+       padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px}
+  header h1{font-size:19px;margin:0;font-weight:600}
+  .ico{background:none;border:0;color:var(--txt);font-size:24px;padding:4px 8px}
+  #punto{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--err);margin-right:8px}
+  #punto.ok{background:var(--ok)}
+
+  #marco{position:relative;background:#000;margin:0 10px;border-radius:10px;overflow:hidden;
+         aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
+  #cam{width:100%;height:100%;object-fit:contain;display:block}
+  #aviso{position:absolute;color:var(--sub);font-size:15px;text-align:center;padding:20px}
+  #marco.full{position:fixed;inset:0;margin:0;border-radius:0;z-index:50;aspect-ratio:auto}
+  #salirFull{display:none;position:absolute;top:12px;right:12px;z-index:51;background:#0008;color:#fff;
+             border:0;border-radius:20px;padding:8px 14px;font-size:15px}
+  #marco.full #salirFull{display:block}
+
+  #st{font-size:13px;color:var(--sub);text-align:center;margin:8px 10px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px}
+  .b{background:var(--card);color:var(--txt);border:0;border-radius:10px;padding:14px 6px;font-size:15px}
+  .b:active{opacity:.7}
+  .b.on{background:var(--on);color:#111}
+  .fila{display:flex;gap:8px;margin:0 10px 10px}
+  .fila label{flex:1;font-size:13px;color:var(--sub)}
+  select,input{width:100%;margin-top:4px;background:var(--card);color:var(--txt);border:1px solid #333;
+               border-radius:8px;padding:11px;font-size:15px}
+
+  .panel{position:fixed;inset:0;background:var(--bg);z-index:60;padding:calc(env(safe-area-inset-top) + 14px) 16px 20px;
+         overflow:auto;display:none}
+  .panel.abierto{display:block}
+  .panel h2{margin:0 0 14px;font-size:19px}
+  .panel label{display:block;font-size:13px;color:var(--sub);margin-bottom:12px}
+  .acc{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:14px;font-size:16px;width:100%;margin-top:6px}
+  .sec{background:var(--card);color:var(--txt);border:0;border-radius:10px;padding:14px;font-size:16px;width:100%;margin-top:8px}
+  #resPrueba{margin-top:12px;font-size:14px;text-align:center;white-space:pre-line;line-height:1.6}
+  #fotoPanel img{width:100%;border-radius:8px}
+  .nota{font-size:12px;color:var(--sub);margin-top:14px;line-height:1.4}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span id="punto"></span>Cámara ESP32</h1>
+  <button class="ico" onclick="abrirConfig()">⚙️</button>
+</header>
+
+<div id="marco" onclick="if(!this.classList.contains('full'))pantallaCompleta(true)">
+  <img id="cam" alt="">
+  <div id="aviso">Tocá ⚙️ para configurar la cámara</div>
+  <button id="salirFull" onclick="event.stopPropagation();pantallaCompleta(false)">✕ Salir</button>
+</div>
+
+<div id="st">—</div>
+
+<div class="grid">
+  <button class="b" id="bL" onclick="luz()">💡 Luz</button>
+  <button class="b" onclick="foto()">📸 Foto</button>
+  <button class="b" onclick="pantallaCompleta(true)">⛶ Completa</button>
+  <button class="b" id="bV" onclick="cmd('vflip=1')">↕ Voltear</button>
+  <button class="b" id="bH" onclick="cmd('hmirror=1')">↔ Espejo</button>
+  <button class="b" onclick="reconectar()">🔄 Reconectar</button>
+</div>
+
+<div class="fila">
+  <label>Resolución
+    <select id="res" onchange="cambiarRes(this.value)">
+      <option value="4">240x240</option>
+      <option value="5">QVGA 320x240</option>
+      <option value="6">CIF 400x296</option>
+      <option value="7">HVGA 480x320</option>
+      <option value="8">VGA 640x480</option>
+      <option value="9">SVGA 800x600</option>
+      <option value="10">XGA 1024x768</option>
+      <option value="11">HD 1280x720</option>
+      <option value="12">SXGA 1280x1024</option>
+      <option value="13">UXGA 1600x1200</option>
+    </select>
+  </label>
+  <label>Calidad
+    <select id="cal" onchange="cmd('calidad='+this.value)">
+      <option value="10">Alta</option>
+      <option value="12">Media</option>
+      <option value="16">Normal</option>
+      <option value="20">Baja (fluido)</option>
+      <option value="30">Muy baja</option>
+    </select>
+  </label>
+</div>
+
+<!-- Configuración -->
+<div class="panel" id="config">
+  <h2>⚙️ Configuración</h2>
+  <label>Dirección de la cámara (IP o dominio)
+    <input id="cHost" placeholder="192.168.100.36" autocapitalize="off" autocorrect="off">
+  </label>
+  <div class="fila" style="margin:0">
+    <label>Puerto web<input id="cPWeb" type="number" placeholder="80"></label>
+    <label>Puerto video<input id="cPStr" type="number" placeholder="81"></label>
+  </div>
+  <label>Clave del stream (SECRET_STREAM_KEY del secrets.h)
+    <input id="cKey" placeholder="clavestream123" autocapitalize="off" autocorrect="off">
+  </label>
+  <div class="fila" style="margin:0">
+    <label>Usuario web<input id="cUser" placeholder="admin" autocapitalize="off" autocorrect="off"></label>
+    <label>Clave web<input id="cPass" type="password" placeholder="cambiame123"></label>
+  </div>
+  <button class="acc" onclick="guardarConfig()">Guardar y conectar</button>
+  <button class="sec" onclick="probar()">Probar conexión</button>
+  <button class="sec" onclick="cerrarConfig()">Cancelar</button>
+  <div id="resPrueba"></div>
+  <p class="nota">En tu casa usá la IP local de la cámara.<br>
+  Desde afuera, poné tu dominio o IP pública y los puertos que redirigiste en el router.</p>
+</div>
+
+<!-- Foto -->
+<div class="panel" id="fotoPanel">
+  <h2>📸 Foto</h2>
+  <img id="fotoImg" alt="">
+  <button class="sec" onclick="document.getElementById('fotoPanel').classList.remove('abierto')">Cerrar</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const cam = $('cam');
+let cfg = JSON.parse(localStorage.getItem('camcfg') || 'null');
+let luzOn = false, conectado = false, timerEstado = null, timerReco = null;
+
+// Limpia lo que el usuario escriba: "http://192.168.1.5/" -> "192.168.1.5"
+function limpiarHost(h){ return (h || '').trim().replace(/^https?:\/\//i, '').replace(/[\/\s].*$/, '').replace(/:\d+$/, ''); }
+// Autenticación básica (funciona con cualquier versión del firmware)
+function hdrs(c){ c = c || cfg; return (c && c.user) ? { 'Authorization': 'Basic ' + btoa(c.user + ':' + (c.pass || '')) } : {}; }
+async function pedir(url, c, ms){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 4000);
+  try { return await fetch(url, { headers: hdrs(c), signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+function base(){ return 'http://' + cfg.host + ':' + (cfg.pweb || 80); }
+function urlStream(){ return 'http://' + cfg.host + ':' + (cfg.pstr || 81) + '/stream?key=' + encodeURIComponent(cfg.key) + '&t=' + Date.now(); }
+function q(path, extra){ return base() + path + '?key=' + encodeURIComponent(cfg.key) + (extra ? '&' + extra : '') + '&t=' + Date.now(); }
+
+function aviso(t){ $('aviso').style.display = t ? 'block' : 'none'; $('aviso').innerText = t || ''; }
+
+function iniciarStream(){
+  if (!cfg) { aviso('Tocá ⚙️ para configurar la cámara'); return; }
+  aviso('Conectando...');
+  cam.src = urlStream();
+}
+function detenerStream(){ cam.removeAttribute('src'); cam.src = ''; }
+function reconectar(){ detenerStream(); setTimeout(iniciarStream, 300); }
+
+cam.onload = () => aviso('');
+cam.onerror = () => {
+  if (!cfg || !cam.getAttribute('src')) return;
+  aviso('Sin video. Reintentando...');
+  clearTimeout(timerReco);
+  timerReco = setTimeout(iniciarStream, 3000);
+};
+
+async function cmd(param){
+  if (!cfg) return;
+  try {
+    const r = await pedir(q('/cmd', param));
+    pintar(await r.json());
+  } catch(e) { marcar(false); }
+}
+function luz(){ cmd('luz=' + (luzOn ? 0 : 1)); }
+async function cambiarRes(v){ await cmd('res=' + v); reconectar(); }
+
+function foto(){
+  if (!cfg) return;
+  $('fotoImg').src = q('/capture');
+  $('fotoPanel').classList.add('abierto');
+}
+
+function pantallaCompleta(on){
+  $('marco').classList.toggle('full', on);
+  try { if (on) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); } catch(e){}
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) $('marco').classList.remove('full'); });
+
+function marcar(ok){
+  conectado = ok;
+  $('punto').classList.toggle('ok', ok);
+  if (!ok) $('st').innerText = 'Sin conexión con la cámara';
+}
+
+function pintar(j){
+  marcar(true);
+  luzOn = j.luz;
+  $('bL').classList.toggle('on', j.luz);
+  $('bV').classList.toggle('on', !!j.vflip);
+  $('bH').classList.toggle('on', !!j.hmirror);
+  if (document.activeElement !== $('res')) $('res').value = j.res;
+  if (document.activeElement !== $('cal')) $('cal').value = j.cal;
+  if (!j.psram) [...$('res').options].forEach(o => o.disabled = +o.value > 5);
+  $('st').innerText = j.ancho + 'x' + j.alto + ' · ' + Number(j.fps).toFixed(1) + ' fps · viendo: ' + j.esp + ' · WiFi ' + j.rssi + ' dBm';
+}
+
+async function estado(){
+  if (!cfg) return;
+  try {
+    const r = await pedir(q('/estado'));
+    pintar(await r.json());
+  } catch(e) { marcar(false); }
+}
+
+// ---- Configuración ----
+function abrirConfig(){
+  $('cHost').value = cfg?.host || '';
+  $('cPWeb').value = cfg?.pweb || 80;
+  $('cPStr').value = cfg?.pstr || 81;
+  $('cKey').value  = cfg?.key  || '';
+  $('cUser').value = cfg?.user || 'admin';
+  $('cPass').value = cfg?.pass || '';
+  $('resPrueba').innerText = '';
+  $('config').classList.add('abierto');
+}
+function cerrarConfig(){ $('config').classList.remove('abierto'); }
+function leerForm(){
+  return { host: limpiarHost($('cHost').value), pweb: +$('cPWeb').value || 80,
+           pstr: +$('cPStr').value || 81, key: $('cKey').value.trim(),
+           user: $('cUser').value.trim(), pass: $('cPass').value };
+}
+// Prueba el video (puerto 81) cargando un cuadro del stream
+function probarVideo(c){
+  return new Promise(ok => {
+    const img = new Image();
+    const t = setTimeout(() => { const v = img.naturalWidth > 0; img.src = ''; ok(v); }, 6000);
+    img.onload = () => { clearTimeout(t); img.src = ''; ok(true); };
+    img.onerror = () => { clearTimeout(t); ok(false); };
+    img.src = 'http://' + c.host + ':' + c.pstr + '/stream?key=' + encodeURIComponent(c.key) + '&t=' + Date.now();
+  });
+}
+async function probar(){
+  const c = leerForm();
+  const out = $('resPrueba');
+  out.style.color = '#9aa0aa';
+  out.innerText = 'Probando ' + c.host + '...';
+  let web = '', video = false;
+  try {
+    const r = await pedir('http://' + c.host + ':' + c.pweb + '/estado?key=' + encodeURIComponent(c.key), c, 5000);
+    if (r.status === 401) web = '🔑 Usuario/clave web incorrectos';
+    else if (r.status === 404) web = '⚠️ La cámara tiene el firmware viejo (falta /estado)';
+    else if (!r.ok) web = '⚠️ Error ' + r.status;
+    else { const j = await r.json(); web = '✅ Controles OK (' + j.ancho + 'x' + j.alto + ', WiFi ' + j.rssi + ' dBm)'; }
+  } catch(e) { web = '❌ Puerto ' + c.pweb + ': sin respuesta (' + (e.name || e) + ')'; }
+  video = await probarVideo(c);
+  out.style.color = (web.startsWith('✅') && video) ? '#30a46c' : '#e5484d';
+  out.innerText = web + '\n' + (video ? '✅ Video OK' : '❌ Video (puerto ' + c.pstr + '): sin respuesta o clave del stream incorrecta');
+}
+function guardarConfig(){
+  const c = leerForm();
+  if (!c.host || !c.key) { $('resPrueba').style.color='#e5484d'; $('resPrueba').innerText = 'Completá dirección y clave'; return; }
+  cfg = c;
+  localStorage.setItem('camcfg', JSON.stringify(cfg));
+  cerrarConfig();
+  reconectar(); estado();
+}
+
+// ---- Ciclo de vida: cortar el video en segundo plano (ahorra datos y la cámara descansa) ----
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { detenerStream(); clearInterval(timerEstado); }
+  else { iniciarStream(); estado(); timerEstado = setInterval(estado, 2000); }
+});
+
+// Botón "atrás" de Android: cerrar paneles / salir de pantalla completa
+const AppNativa = window.Capacitor?.Plugins?.App;
+if (AppNativa) {
+  AppNativa.addListener('backButton', () => {
+    if ($('marco').classList.contains('full')) pantallaCompleta(false);
+    else if ($('config').classList.contains('abierto') && cfg) cerrarConfig();
+    else if ($('fotoPanel').classList.contains('abierto')) $('fotoPanel').classList.remove('abierto');
+    else AppNativa.exitApp();
+  });
+}
+
+if (!cfg) abrirConfig();
+iniciarStream(); estado();
+timerEstado = setInterval(estado, 2000);
+</script>
+</body>
+</html>
