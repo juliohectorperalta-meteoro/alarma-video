@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -42,9 +45,19 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../camara-esp32.apk
 
-      - name: Subir APK
+      - name: Subir APK (Artifacts)
         uses: actions/upload-artifact@v4
         with:
           name: camara-esp32-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: camara-esp32.apk
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Cámara ESP32 v1.0.${{ github.run_number }}
+          files: camara-esp32.apk
+
+  
