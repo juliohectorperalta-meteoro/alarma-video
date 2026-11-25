@@ -14,7 +14,6 @@
   .ico{background:none;border:0;color:var(--txt);font-size:24px;padding:4px 8px}
   #punto{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--err);margin-right:8px}
   #punto.ok{background:var(--ok)}
-
   #marco{position:relative;background:#000;margin:0 10px;border-radius:10px;overflow:hidden;
          aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
   #cam{width:100%;height:100%;object-fit:contain;display:block}
@@ -23,18 +22,15 @@
   #salirFull{display:none;position:absolute;top:12px;right:12px;z-index:51;background:#0008;color:#fff;
              border:0;border-radius:20px;padding:8px 14px;font-size:15px}
   #marco.full #salirFull{display:block}
-
   #st{font-size:13px;color:var(--sub);text-align:center;margin:8px 10px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px}
   .b{background:var(--card);color:var(--txt);border:0;border-radius:10px;padding:14px 6px;font-size:15px}
   .b:active{opacity:.7}
   .b.on{background:var(--on);color:#111}
-  .b.al{background:var(--err);color:#fff}
   .fila{display:flex;gap:8px;margin:0 10px 10px}
   .fila label{flex:1;font-size:13px;color:var(--sub)}
   select,input{width:100%;margin-top:4px;background:var(--card);color:var(--txt);border:1px solid #333;
                border-radius:8px;padding:11px;font-size:15px}
-
   .panel{position:fixed;inset:0;background:var(--bg);z-index:60;padding:calc(env(safe-area-inset-top) + 14px) 16px 20px;
          overflow:auto;display:none}
   .panel.abierto{display:block}
@@ -62,51 +58,26 @@
 
 <div id="st">—</div>
 
-<div style="margin:10px 10px 0">
-  <button class="b" id="bA" style="width:100%;font-size:17px;padding:16px" onclick="alarma()">🚨 Activar alarma</button>
-</div>
 <div class="grid">
   <button class="b" id="bL" onclick="luz()">💡 Luz</button>
   <button class="b" onclick="foto()">📸 Foto</button>
   <button class="b" onclick="pantallaCompleta(true)">⛶ Completa</button>
-  <button class="b" id="bV" onclick="cmd('vflip=1')">↕ Voltear</button>
-  <button class="b" id="bH" onclick="cmd('hmirror=1')">↔ Espejo</button>
+  <button class="b" id="bV" onclick="alternar('vflip')">↕ Voltear</button>
+  <button class="b" id="bH" onclick="alternar('hmirror')">↔ Espejo</button>
   <button class="b" onclick="reconectar()">🔄 Reconectar</button>
 </div>
 
 <div class="fila">
   <label>Resolución
-    <select id="res" onchange="cambiarRes(this.value)">
-      <option value="4">240x240</option>
-      <option value="5">QVGA 320x240</option>
-      <option value="6">CIF 400x296</option>
-      <option value="7">HVGA 480x320</option>
-      <option value="8">VGA 640x480</option>
-      <option value="9">SVGA 800x600</option>
-      <option value="10">XGA 1024x768</option>
-      <option value="11">HD 1280x720</option>
-      <option value="12">SXGA 1280x1024</option>
-      <option value="13">UXGA 1600x1200</option>
-    </select>
+    <select id="res" onchange="cambiarRes(this.value)"></select>
   </label>
   <label>Calidad
-    <select id="cal" onchange="cmd('calidad='+this.value)">
+    <select id="cal" onchange="control('quality', this.value)">
       <option value="10">Alta</option>
       <option value="12">Media</option>
       <option value="16">Normal</option>
       <option value="20">Baja (fluido)</option>
       <option value="30">Muy baja</option>
-    </select>
-  </label>
-</div>
-<div class="fila">
-  <label>Sensibilidad de la alarma
-    <select id="sens" onchange="cmd('sens='+this.value)">
-      <option value="3">Muy alta (3%)</option>
-      <option value="5">Alta (5%)</option>
-      <option value="8">Media (8%)</option>
-      <option value="12">Baja (12%)</option>
-      <option value="20">Muy baja (20%)</option>
     </select>
   </label>
 </div>
@@ -121,197 +92,181 @@
     <label>Puerto web<input id="cPWeb" type="number" placeholder="80"></label>
     <label>Puerto video<input id="cPStr" type="number" placeholder="81"></label>
   </div>
-  <label>Clave del stream (SECRET_STREAM_KEY del secrets.h)
-    <input id="cKey" placeholder="clavestream123" autocapitalize="off" autocorrect="off">
-  </label>
-  <div class="fila" style="margin:0">
-    <label>Usuario web<input id="cUser" placeholder="admin" autocapitalize="off" autocorrect="off"></label>
-    <label>Clave web<input id="cPass" type="password" placeholder="cambiame123"></label>
-  </div>
   <button class="acc" onclick="guardarConfig()">Guardar y conectar</button>
   <button class="sec" onclick="probar()">Probar conexión</button>
   <button class="sec" onclick="cerrarConfig()">Cancelar</button>
   <div id="resPrueba"></div>
-  <p class="nota">En tu casa usá la IP local de la cámara.<br>
-  Desde afuera, poné tu dominio o IP pública y los puertos que redirigiste en el router.</p>
+  <p class="nota">Funciona con el ejemplo oficial CameraWebServer.<br>
+  En tu casa usá la IP local de la cámara. Desde afuera, tu dominio o IP pública con los puertos redirigidos.</p>
 </div>
 
 <!-- Foto -->
 <div class="panel" id="fotoPanel">
   <h2>📸 Foto</h2>
   <img id="fotoImg" alt="">
-  <button class="sec" onclick="document.getElementById('fotoPanel').classList.remove('abierto')">Cerrar</button>
+  <button class="sec" onclick="$('fotoPanel').classList.remove('abierto')">Cerrar</button>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
 const cam = $('cam');
-let cfg = JSON.parse(localStorage.getItem('camcfg') || 'null');
-let luzOn = false, conectado = false, timerEstado = null, timerReco = null;
-let enAlarma = null;   // null = todavía no se sabe
+let cfg = JSON.parse(localStorage.getItem('camcfg2') || 'null');
+let ultimo = null, timerEstado = null, timerReco = null;
 
-// Limpia lo que el usuario escriba: "http://192.168.1.5/" -> "192.168.1.5"
+// --- Tablas de resolución (el número depende de la versión de la librería de cámara) ---
+const NUEVA = ['96x96','160x120','128x128','176x144','240x176','240x240','320x240','320x320','400x296',
+               '480x320','640x480','800x600','1024x768','1280x720','1280x1024','1600x1200'];
+const VIEJA = ['96x96','160x120','176x144','240x176','240x240','320x240','400x296','480x320','640x480',
+               '800x600','1024x768','1280x720','1280x1024','1600x1200'];
+let tabla = NUEVA;   // se confirma al ver el primer cuadro del video
+const OPCIONES = [['320x240','QVGA 320x240'],['400x296','CIF 400x296'],['480x320','HVGA 480x320'],
+                  ['640x480','VGA 640x480'],['800x600','SVGA 800x600'],['1024x768','XGA 1024x768'],
+                  ['1280x720','HD 1280x720'],['1280x1024','SXGA 1280x1024'],['1600x1200','UXGA 1600x1200']];
+function armarResoluciones(){
+  const sel = $('res'); const actual = sel.value; sel.innerHTML = '';
+  OPCIONES.forEach(([tam, nombre]) => {
+    const i = tabla.indexOf(tam);
+    if (i >= 0) sel.add(new Option(nombre, i));
+  });
+  if (actual) sel.value = actual;
+}
+armarResoluciones();
+
 function limpiarHost(h){ return (h || '').trim().replace(/^https?:\/\//i, '').replace(/[\/\s].*$/, '').replace(/:\d+$/, ''); }
-// Autenticación básica (funciona con cualquier versión del firmware)
-function hdrs(c){ c = c || cfg; return (c && c.user) ? { 'Authorization': 'Basic ' + btoa(c.user + ':' + (c.pass || '')) } : {}; }
-async function pedir(url, c, ms){
+function base(c){ c = c || cfg; return 'http://' + c.host + ':' + (c.pweb || 80); }
+function urlStream(){ return 'http://' + cfg.host + ':' + (cfg.pstr || 81) + '/stream?t=' + Date.now(); }
+async function pedir(url, ms){
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms || 4000);
-  try { return await fetch(url, { headers: hdrs(c), signal: ctrl.signal }); }
+  try { return await fetch(url, { signal: ctrl.signal }); }
   finally { clearTimeout(t); }
 }
-function base(){ return 'http://' + cfg.host + ':' + (cfg.pweb || 80); }
-function urlStream(){ return 'http://' + cfg.host + ':' + (cfg.pstr || 81) + '/stream?key=' + encodeURIComponent(cfg.key) + '&t=' + Date.now(); }
-function q(path, extra){ return base() + path + '?key=' + encodeURIComponent(cfg.key) + (extra ? '&' + extra : '') + '&t=' + Date.now(); }
-
 function aviso(t){ $('aviso').style.display = t ? 'block' : 'none'; $('aviso').innerText = t || ''; }
 
+// --- Video ---
 function iniciarStream(){
   if (!cfg) { aviso('Tocá ⚙️ para configurar la cámara'); return; }
-  if (enAlarma) { detenerStream(); aviso('🚨 MODO ALARMA\nVideo pausado: la cámara está vigilando'); return; }
   aviso('Conectando...');
   cam.src = urlStream();
 }
-function detenerStream(){ cam.removeAttribute('src'); cam.src = ''; }
+function detenerStream(){ cam.removeAttribute('src'); }
 function reconectar(){ detenerStream(); setTimeout(iniciarStream, 300); }
-
-cam.onload = () => aviso('');
+cam.onload = () => { aviso(''); detectarTabla(); };
 cam.onerror = () => {
-  if (!cfg || !cam.getAttribute('src') || enAlarma) return;
+  if (!cfg || !cam.getAttribute('src')) return;
   aviso('Sin video. Reintentando...');
   clearTimeout(timerReco);
   timerReco = setTimeout(iniciarStream, 3000);
 };
 
-async function cmd(param){
-  if (!cfg) return;
-  try {
-    const r = await pedir(q('/cmd', param));
-    pintar(await r.json());
-  } catch(e) { marcar(false); }
+// Compara el tamaño real del video con el número de resolución que informa la cámara
+function detectarTabla(){
+  if (!ultimo || !cam.naturalWidth) return;
+  const real = cam.naturalWidth + 'x' + cam.naturalHeight;
+  const fs = ultimo.framesize;
+  const nueva = (NUEVA[fs] === real), vieja = (VIEJA[fs] === real);
+  const t = (vieja && !nueva) ? VIEJA : NUEVA;
+  if (t !== tabla) { tabla = t; armarResoluciones(); $('res').value = fs; }
 }
-function luz(){ cmd('luz=' + (luzOn ? 0 : 1)); }
-function alarma(){
-  if (enAlarma) cmd('alarma=0');
-  else if (confirm('¿Activar la alarma?\nSe corta el video y la cámara avisa por Telegram si detecta movimiento.')) cmd('alarma=1');
-}
-async function cambiarRes(v){ await cmd('res=' + v); reconectar(); }
 
+// --- Comandos (mismos que usa la página del ejemplo) ---
+async function control(variable, valor){
+  if (!cfg) return;
+  try { await pedir(base() + '/control?var=' + variable + '&val=' + valor); }
+  catch(e) {}
+  estado();
+}
+function alternar(v){ if (ultimo) control(v, ultimo[v] ? 0 : 1); }
+function luz(){
+  const encendida = ultimo && ultimo.led_intensity > 0;
+  control('led_intensity', encendida ? 0 : 255);
+}
+async function cambiarRes(v){ await control('framesize', v); reconectar(); }
 function foto(){
   if (!cfg) return;
-  $('fotoImg').src = q('/capture');
+  $('fotoImg').src = base() + '/capture?t=' + Date.now();
   $('fotoPanel').classList.add('abierto');
 }
-
 function pantallaCompleta(on){
   $('marco').classList.toggle('full', on);
   try { if (on) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); } catch(e){}
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) $('marco').classList.remove('full'); });
 
+// --- Estado ---
 function marcar(ok){
-  conectado = ok;
   $('punto').classList.toggle('ok', ok);
   if (!ok) $('st').innerText = 'Sin conexión con la cámara';
 }
-
 function pintar(j){
+  ultimo = j;
   marcar(true);
-  luzOn = j.luz;
-  $('bL').classList.toggle('on', j.luz);
+  const hayLuz = ('led_intensity' in j) && j.led_intensity >= 0;
+  $('bL').style.visibility = hayLuz ? 'visible' : 'hidden';
+  $('bL').classList.toggle('on', j.led_intensity > 0);
   $('bV').classList.toggle('on', !!j.vflip);
   $('bH').classList.toggle('on', !!j.hmirror);
-  if (document.activeElement !== $('res')) $('res').value = j.res;
-  if (document.activeElement !== $('cal')) $('cal').value = j.cal;
-  if (!j.psram) [...$('res').options].forEach(o => o.disabled = +o.value > 5);
-  if (j.sens !== undefined && document.activeElement !== $('sens')) $('sens').value = j.sens;
-
-  // Si el firmware no tiene alarma, se ocultan esos controles
-  const tieneAlarma = ('alarma' in j);
-  $('bA').parentElement.style.display = tieneAlarma ? '' : 'none';
-  $('sens').closest('.fila').style.display = tieneAlarma ? '' : 'none';
-
-  const al = !!j.alarma;
-  $('bA').classList.toggle('al', al);
-  $('bA').innerText = al ? '🎥 Desactivar alarma y ver video' : '🚨 Activar alarma';
-  if (al !== enAlarma) {            // cambió el modo
-    enAlarma = al;
-    if (al) { detenerStream(); aviso('🚨 MODO ALARMA\nVideo pausado: la cámara está vigilando'); }
-    else reconectar();
-  }
-  $('st').innerText = al
-    ? '🚨 Alarma · movimiento ' + j.mov + '% (dispara en ' + j.sens + '%) · alertas: ' + j.alertas + ' · WiFi ' + j.rssi + ' dBm'
-    : j.ancho + 'x' + j.alto + ' · ' + Number(j.fps).toFixed(1) + ' fps · viendo: ' + j.esp + ' · WiFi ' + j.rssi + ' dBm';
+  if (document.activeElement !== $('res')) $('res').value = j.framesize;
+  if (document.activeElement !== $('cal')) $('cal').value = j.quality;
+  const tam = cam.naturalWidth ? cam.naturalWidth + 'x' + cam.naturalHeight : (tabla[j.framesize] || '?');
+  $('st').innerText = 'Conectado · ' + tam + ' · calidad ' + j.quality + (j.led_intensity > 0 ? ' · luz encendida' : '');
 }
-
 async function estado(){
   if (!cfg) return;
-  try {
-    const r = await pedir(q('/estado'));
-    pintar(await r.json());
-  } catch(e) { marcar(false); }
+  try { const r = await pedir(base() + '/status'); pintar(await r.json()); }
+  catch(e) { marcar(false); }
 }
 
-// ---- Configuración ----
+// --- Configuración ---
 function abrirConfig(){
   $('cHost').value = cfg?.host || '';
   $('cPWeb').value = cfg?.pweb || 80;
   $('cPStr').value = cfg?.pstr || 81;
-  $('cKey').value  = cfg?.key  || '';
-  $('cUser').value = cfg?.user || 'admin';
-  $('cPass').value = cfg?.pass || '';
   $('resPrueba').innerText = '';
   $('config').classList.add('abierto');
 }
 function cerrarConfig(){ $('config').classList.remove('abierto'); }
 function leerForm(){
-  return { host: limpiarHost($('cHost').value), pweb: +$('cPWeb').value || 80,
-           pstr: +$('cPStr').value || 81, key: $('cKey').value.trim(),
-           user: $('cUser').value.trim(), pass: $('cPass').value };
+  return { host: limpiarHost($('cHost').value), pweb: +$('cPWeb').value || 80, pstr: +$('cPStr').value || 81 };
 }
-// Prueba el video (puerto 81) cargando un cuadro del stream
 function probarVideo(c){
   return new Promise(ok => {
     const img = new Image();
-    const t = setTimeout(() => { const v = img.naturalWidth > 0; img.src = ''; ok(v); }, 6000);
-    img.onload = () => { clearTimeout(t); img.src = ''; ok(true); };
+    const t = setTimeout(() => { const v = img.naturalWidth > 0; img.removeAttribute('src'); ok(v); }, 6000);
+    img.onload = () => { clearTimeout(t); img.removeAttribute('src'); ok(true); };
     img.onerror = () => { clearTimeout(t); ok(false); };
-    img.src = 'http://' + c.host + ':' + c.pstr + '/stream?key=' + encodeURIComponent(c.key) + '&t=' + Date.now();
+    img.src = 'http://' + c.host + ':' + c.pstr + '/stream?t=' + Date.now();
   });
 }
 async function probar(){
-  const c = leerForm();
-  const out = $('resPrueba');
+  const c = leerForm(), out = $('resPrueba');
   out.style.color = '#9aa0aa';
   out.innerText = 'Probando ' + c.host + '...';
-  let web = '', video = false;
+  let web;
   try {
-    const r = await pedir('http://' + c.host + ':' + c.pweb + '/estado?key=' + encodeURIComponent(c.key), c, 5000);
-    if (r.status === 401) web = '🔑 Usuario/clave web incorrectos';
-    else if (r.status === 404) web = '⚠️ La cámara tiene el firmware viejo (falta /estado)';
-    else if (!r.ok) web = '⚠️ Error ' + r.status;
-    else { const j = await r.json(); web = '✅ Controles OK (' + j.ancho + 'x' + j.alto + ', WiFi ' + j.rssi + ' dBm)'; }
-  } catch(e) { web = '❌ Puerto ' + c.pweb + ': sin respuesta (' + (e.name || e) + ')'; }
-  video = await probarVideo(c);
+    const r = await pedir(base(c) + '/status', 5000);
+    web = r.ok ? '✅ Controles OK' : '⚠️ Error ' + r.status;
+  } catch(e) { web = '❌ Puerto ' + c.pweb + ': sin respuesta'; }
+  const video = await probarVideo(c);
   out.style.color = (web.startsWith('✅') && video) ? '#30a46c' : '#e5484d';
-  out.innerText = web + '\n' + (video ? '✅ Video OK' : '❌ Video (puerto ' + c.pstr + '): sin respuesta o clave del stream incorrecta');
+  out.innerText = web + '\n' + (video ? '✅ Video OK' : '❌ Video (puerto ' + c.pstr + '): sin respuesta');
 }
 function guardarConfig(){
   const c = leerForm();
-  if (!c.host || !c.key) { $('resPrueba').style.color='#e5484d'; $('resPrueba').innerText = 'Completá dirección y clave'; return; }
+  if (!c.host) { $('resPrueba').style.color = '#e5484d'; $('resPrueba').innerText = 'Completá la dirección'; return; }
   cfg = c;
-  localStorage.setItem('camcfg', JSON.stringify(cfg));
+  localStorage.setItem('camcfg2', JSON.stringify(cfg));
   cerrarConfig();
   reconectar(); estado();
 }
 
-// ---- Ciclo de vida: cortar el video en segundo plano (ahorra datos y la cámara descansa) ----
+// --- Segundo plano: cortar el video al minimizar ---
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { detenerStream(); clearInterval(timerEstado); }
-  else { iniciarStream(); estado(); timerEstado = setInterval(estado, 2000); }
+  else { iniciarStream(); estado(); timerEstado = setInterval(estado, 3000); }
 });
 
-// Botón "atrás" de Android: cerrar paneles / salir de pantalla completa
+// --- Botón atrás de Android ---
 const AppNativa = window.Capacitor?.Plugins?.App;
 if (AppNativa) {
   AppNativa.addListener('backButton', () => {
@@ -322,9 +277,13 @@ if (AppNativa) {
   });
 }
 
+if (!cfg) {
+  const viejo = JSON.parse(localStorage.getItem('camcfg') || 'null');   // reusar la IP de la versión anterior
+  if (viejo && viejo.host) { cfg = { host: viejo.host, pweb: viejo.pweb || 80, pstr: viejo.pstr || 81 }; localStorage.setItem('camcfg2', JSON.stringify(cfg)); }
+}
 if (!cfg) abrirConfig();
 iniciarStream(); estado();
-timerEstado = setInterval(estado, 2000);
+timerEstado = setInterval(estado, 3000);
 </script>
 </body>
 </html>
