@@ -18,7 +18,7 @@
   #marco{position:relative;background:#000;margin:0 10px;border-radius:10px;overflow:hidden;
          aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
   #cam{width:100%;height:100%;object-fit:contain;display:block}
-  #aviso{position:absolute;color:var(--sub);font-size:15px;text-align:center;padding:20px}
+  #aviso{position:absolute;color:var(--sub);font-size:15px;text-align:center;padding:20px;white-space:pre-line}
   #marco.full{position:fixed;inset:0;margin:0;border-radius:0;z-index:50;aspect-ratio:auto}
   #salirFull{display:none;position:absolute;top:12px;right:12px;z-index:51;background:#0008;color:#fff;
              border:0;border-radius:20px;padding:8px 14px;font-size:15px}
@@ -29,6 +29,7 @@
   .b{background:var(--card);color:var(--txt);border:0;border-radius:10px;padding:14px 6px;font-size:15px}
   .b:active{opacity:.7}
   .b.on{background:var(--on);color:#111}
+  .b.al{background:var(--err);color:#fff}
   .fila{display:flex;gap:8px;margin:0 10px 10px}
   .fila label{flex:1;font-size:13px;color:var(--sub)}
   select,input{width:100%;margin-top:4px;background:var(--card);color:var(--txt);border:1px solid #333;
@@ -61,6 +62,9 @@
 
 <div id="st">—</div>
 
+<div style="margin:10px 10px 0">
+  <button class="b" id="bA" style="width:100%;font-size:17px;padding:16px" onclick="alarma()">🚨 Activar alarma</button>
+</div>
 <div class="grid">
   <button class="b" id="bL" onclick="luz()">💡 Luz</button>
   <button class="b" onclick="foto()">📸 Foto</button>
@@ -92,6 +96,17 @@
       <option value="16">Normal</option>
       <option value="20">Baja (fluido)</option>
       <option value="30">Muy baja</option>
+    </select>
+  </label>
+</div>
+<div class="fila">
+  <label>Sensibilidad de la alarma
+    <select id="sens" onchange="cmd('sens='+this.value)">
+      <option value="3">Muy alta (3%)</option>
+      <option value="5">Alta (5%)</option>
+      <option value="8">Media (8%)</option>
+      <option value="12">Baja (12%)</option>
+      <option value="20">Muy baja (20%)</option>
     </select>
   </label>
 </div>
@@ -133,6 +148,7 @@ const $ = id => document.getElementById(id);
 const cam = $('cam');
 let cfg = JSON.parse(localStorage.getItem('camcfg') || 'null');
 let luzOn = false, conectado = false, timerEstado = null, timerReco = null;
+let enAlarma = null;   // null = todavía no se sabe
 
 // Limpia lo que el usuario escriba: "http://192.168.1.5/" -> "192.168.1.5"
 function limpiarHost(h){ return (h || '').trim().replace(/^https?:\/\//i, '').replace(/[\/\s].*$/, '').replace(/:\d+$/, ''); }
@@ -152,6 +168,7 @@ function aviso(t){ $('aviso').style.display = t ? 'block' : 'none'; $('aviso').i
 
 function iniciarStream(){
   if (!cfg) { aviso('Tocá ⚙️ para configurar la cámara'); return; }
+  if (enAlarma) { detenerStream(); aviso('🚨 MODO ALARMA\nVideo pausado: la cámara está vigilando'); return; }
   aviso('Conectando...');
   cam.src = urlStream();
 }
@@ -160,7 +177,7 @@ function reconectar(){ detenerStream(); setTimeout(iniciarStream, 300); }
 
 cam.onload = () => aviso('');
 cam.onerror = () => {
-  if (!cfg || !cam.getAttribute('src')) return;
+  if (!cfg || !cam.getAttribute('src') || enAlarma) return;
   aviso('Sin video. Reintentando...');
   clearTimeout(timerReco);
   timerReco = setTimeout(iniciarStream, 3000);
@@ -174,6 +191,10 @@ async function cmd(param){
   } catch(e) { marcar(false); }
 }
 function luz(){ cmd('luz=' + (luzOn ? 0 : 1)); }
+function alarma(){
+  if (enAlarma) cmd('alarma=0');
+  else if (confirm('¿Activar la alarma?\nSe corta el video y la cámara avisa por Telegram si detecta movimiento.')) cmd('alarma=1');
+}
 async function cambiarRes(v){ await cmd('res=' + v); reconectar(); }
 
 function foto(){
@@ -203,7 +224,19 @@ function pintar(j){
   if (document.activeElement !== $('res')) $('res').value = j.res;
   if (document.activeElement !== $('cal')) $('cal').value = j.cal;
   if (!j.psram) [...$('res').options].forEach(o => o.disabled = +o.value > 5);
-  $('st').innerText = j.ancho + 'x' + j.alto + ' · ' + Number(j.fps).toFixed(1) + ' fps · viendo: ' + j.esp + ' · WiFi ' + j.rssi + ' dBm';
+  if (j.sens !== undefined && document.activeElement !== $('sens')) $('sens').value = j.sens;
+
+  const al = !!j.alarma;
+  $('bA').classList.toggle('al', al);
+  $('bA').innerText = al ? '🎥 Desactivar alarma y ver video' : '🚨 Activar alarma';
+  if (al !== enAlarma) {            // cambió el modo
+    enAlarma = al;
+    if (al) { detenerStream(); aviso('🚨 MODO ALARMA\nVideo pausado: la cámara está vigilando'); }
+    else reconectar();
+  }
+  $('st').innerText = al
+    ? '🚨 Alarma · movimiento ' + j.mov + '% (dispara en ' + j.sens + '%) · alertas: ' + j.alertas + ' · WiFi ' + j.rssi + ' dBm'
+    : j.ancho + 'x' + j.alto + ' · ' + Number(j.fps).toFixed(1) + ' fps · viendo: ' + j.esp + ' · WiFi ' + j.rssi + ' dBm';
 }
 
 async function estado(){
