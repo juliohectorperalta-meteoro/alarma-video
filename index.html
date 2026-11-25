@@ -176,10 +176,22 @@ async function control(variable, valor){
   catch(e) {}
   estado();
 }
-function alternar(v){ if (ultimo) control(v, ultimo[v] ? 0 : 1); }
+// Estado local: los botones funcionan aunque /status no se pueda leer
+const local = { vflip: 1, hmirror: 1, led: 0 };
+function alternar(v){
+  const actual = (ultimo && v in ultimo) ? +ultimo[v] : local[v];
+  local[v] = actual ? 0 : 1;
+  if (ultimo) ultimo[v] = local[v];
+  $(v === 'vflip' ? 'bV' : 'bH').classList.toggle('on', !!local[v]);
+  control(v, local[v]);
+}
 function luz(){
-  const encendida = ultimo && ultimo.led_intensity > 0;
-  control('led_intensity', encendida ? 0 : 255);
+  const actual = (ultimo && 'led_intensity' in ultimo) ? +ultimo.led_intensity : local.led;
+  if (actual < 0) { $('st').innerText = '⚠️ La luz no está habilitada en el firmware de la cámara'; return; }
+  local.led = actual > 0 ? 0 : 255;
+  if (ultimo) ultimo.led_intensity = local.led;
+  $('bL').classList.toggle('on', local.led > 0);
+  control('led_intensity', local.led);
 }
 async function cambiarRes(v){ await control('framesize', v); reconectar(); }
 function foto(){
@@ -200,6 +212,9 @@ function marcar(ok){
 }
 function pintar(j){
   ultimo = j;
+  if ('vflip' in j) local.vflip = +j.vflip;
+  if ('hmirror' in j) local.hmirror = +j.hmirror;
+  if ('led_intensity' in j) local.led = +j.led_intensity;
   marcar(true);
   const hayLuz = ('led_intensity' in j) && j.led_intensity >= 0;
   $('bL').style.visibility = hayLuz ? 'visible' : 'hidden';
@@ -213,8 +228,18 @@ function pintar(j){
 }
 async function estado(){
   if (!cfg) return;
-  try { const r = await pedir(base() + '/status'); pintar(await r.json()); }
-  catch(e) { marcar(false); }
+  let r;
+  try { r = await pedir(base() + '/status'); }
+  catch(e) { marcar(false); return; }
+  // Leer la respuesta de forma tolerante (texto u objeto, según cómo la entregue Android)
+  try {
+    const txt = await r.text();
+    const j = (typeof txt === 'string') ? JSON.parse(txt) : txt;
+    pintar(j);
+  } catch(e) {
+    $('punto').classList.add('ok');
+    $('st').innerText = 'Conectado (sin datos de estado)';
+  }
 }
 
 // --- Configuración ---
