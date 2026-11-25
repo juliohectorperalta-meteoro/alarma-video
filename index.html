@@ -226,6 +226,11 @@ function pintar(j){
   if (!j.psram) [...$('res').options].forEach(o => o.disabled = +o.value > 5);
   if (j.sens !== undefined && document.activeElement !== $('sens')) $('sens').value = j.sens;
 
+  // Si el firmware no tiene alarma, se ocultan esos controles
+  const tieneAlarma = ('alarma' in j);
+  $('bA').parentElement.style.display = tieneAlarma ? '' : 'none';
+  $('sens').closest('.fila').style.display = tieneAlarma ? '' : 'none';
+
   const al = !!j.alarma;
   $('bA').classList.toggle('al', al);
   $('bA').innerText = al ? '🎥 Desactivar alarma y ver video' : '🚨 Activar alarma';
